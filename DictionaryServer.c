@@ -130,11 +130,15 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		//to existing meaning and add new entry to the table and delete old word-meaning pair
 		case INSERT:    
 				temp = linearSearch(node_arg->word);
-				if(strcmp(temp, "") == 0)          //the word is not present
-					updated_meaning = node_arg->meaning;
+				if(strcmp(temp, "") == 0)			 //the word is not present
+				{         
+					updated_meaning = (char *) malloc(sizeof(strlen(node_arg->meaning))+1);
+					strcpy(updated_meaning,node_arg->meaning);
+				}
 				else					
 				{
 					updated_meaning = (char *) malloc(sizeof(temp)+sizeof(node_arg->meaning)+3);//add 3 for ", " and '0/'
+					strcpy(updated_meaning,temp);
 					strcat(updated_meaning,", ");
 					strcat(updated_meaning,node_arg->meaning);
 					deletion(node_arg->word); // delete the old node after insertion of the new				
@@ -150,7 +154,7 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 				free(updated_meaning);			
 				break;
 
-		case SEARCH:DELETE:	strcpy(result_data.meaning,linearSearch(node_arg->word));
+		case SEARCH:DELETE:	result_data.meaning = linearSearch(node_arg->word);
 				        if(strcmp(result_data.meaning,"") == 0) //sending fail flag
 					{
 						result_data.word = "";
