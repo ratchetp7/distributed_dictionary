@@ -13,6 +13,7 @@
 #define SUCCESS 1
 
 
+
 struct node *dict_index [26];
 
 struct node
@@ -31,7 +32,6 @@ int insert (char* word1 , char* meaning1) //insert new node in the list
 	struct node *new_node, *current;
 	
 	new_node = (struct node*) malloc(sizeof(struct node));
-	
 	new_node->word = (char*) malloc(strlen(word1)+1);
 	strcpy(new_node->word,word1);
 	new_node->meaning = (char*) malloc(strlen(meaning1)+1);
@@ -63,7 +63,6 @@ char* linearSearch(char* key)
 	struct node* search_node;	
 	search_node = dict_index [key[0]-97];
 	
-	
 	while (search_node != NULL)
 	{       
 		if( strcmp(search_node->word,key) == 0)//word found			
@@ -73,6 +72,7 @@ char* linearSearch(char* key)
 	}
 	return "";
 }
+
 
 int deletion(char* key)
 {
@@ -122,24 +122,37 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 {
 	enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 	static dict_data result_data;
-	char* test;
+	char* updated_meaning = (char *) malloc(sizeof(char));
 	switch(node_arg->flag)
 	{
-		case INSERT:    if(insert(node_arg->word, node_arg->meaning))
+		//case insert searches for an existing entry, if not found then 
+		//make a new entry then add it else append the new meaning 
+		//to existing meaning and add new entry to the table and delete old word-meaning pair
+		case INSERT:    
+				strcpy(updated_meaning , linearSearch(node_arg->word));
+				if(strcmp(updated_meaning, "") == 0)          //the word is not present
+					updated_meaning = node_arg->meaning;
+				else					
+				{
+					strcat(updated_meaning,", ");
+					strcat(updated_meaning,node_arg->meaning);
+					deletion(node_arg->word); // delete the old node after insertion of the new				
+				}
+
+				if(insert(node_arg->word, updated_meaning))
 				{
 					result_data.word="";
 					result_data.meaning = "";
 					result_data.flag = SUCCESS;
 					
-				}				
+				}	
+				free(updated_meaning);			
 				break;
 
-		case SEARCH:DELETE:    test = linearSearch(node_arg->word);
-					result_data.meaning = test;
-				       if(strcmp(result_data.meaning,"")==0) //sending fail flag
+		case SEARCH:DELETE:	strcpy(result_data.meaning,linearSearch(node_arg->word));
+				        if(strcmp(result_data.meaning,"") == 0) //sending fail flag
 					{
 						result_data.word = "";
-						result_data.meaning = "";
 						result_data.flag = FAIL;
 					}
 					else	

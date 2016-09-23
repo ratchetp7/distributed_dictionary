@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "dictionary.h"
+
 #define FAIL  0
 #define SUCCESS 1
 #define INSERT_OP 2
@@ -97,10 +98,27 @@ int init_insert()
    
 	
 	dict_data *insert_result_data , insert_data = {"","",0};
-	printf("PLease enter the word: ");
- 	x = readinput();
-	printf("Please enter it's meaning (seperate meanings with commas): ");
-	y = readinput();
+	do
+	{
+		printf("PLease enter the word: ");
+ 		x = readinput();
+		if(strcmp(x, "")==0)
+			printf("Please Enter a non-empty value!!!\n");
+		else
+			break;
+			
+	}while(1);
+	do
+	{
+		printf("Please enter it's meaning (seperate meanings with commas): ");
+		y = readinput();
+		if(strcmp(x, "")==0)
+			printf("Please Enter a non-empty value!!!\n");
+		else
+			break;
+			
+	}while(1);
+	
 	insert_data.word = verifyAndToSmall(x, strlen(x));
 	insert_data.meaning =verifyAndToSmall(y, strlen(y));
 	insert_data.flag = INSERT_OP;
