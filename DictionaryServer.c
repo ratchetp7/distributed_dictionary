@@ -122,18 +122,19 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 {
 	enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 	static dict_data result_data;
-	char* updated_meaning = (char *) malloc(sizeof(char));
+	char  *updated_meaning, *temp;
 	switch(node_arg->flag)
 	{
 		//case insert searches for an existing entry, if not found then 
 		//make a new entry then add it else append the new meaning 
 		//to existing meaning and add new entry to the table and delete old word-meaning pair
 		case INSERT:    
-				strcpy(updated_meaning , linearSearch(node_arg->word));
-				if(strcmp(updated_meaning, "") == 0)          //the word is not present
+				temp = linearSearch(node_arg->word);
+				if(strcmp(temp, "") == 0)          //the word is not present
 					updated_meaning = node_arg->meaning;
 				else					
 				{
+					updated_meaning = (char *) malloc(sizeof(temp)+sizeof(node_arg->meaning)+3);//add 3 for ", " and '0/'
 					strcat(updated_meaning,", ");
 					strcat(updated_meaning,node_arg->meaning);
 					deletion(node_arg->word); // delete the old node after insertion of the new				
