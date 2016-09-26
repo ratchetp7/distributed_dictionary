@@ -11,11 +11,12 @@
 #define DELETE_OP 4
 #define CONFIRM_DELETE_OP 5
 #define CHUNK 50
-
+#define CLIENT_ID 1
 
 
 CLIENT *cl;
 int is_stdin_empty = 0;
+int timestamp[3];
 
 //custom function to flush the stdin stream
 int flushBuffer()                                                   
@@ -77,6 +78,7 @@ char* verifyAndToSmall(char* inp_string, int str_length)
 int init_search()
 {
 	char *Q_word = NULL;
+	setTimeStamp();
 	dict_data search_data = {"","",0};
 	dict_data *search_result_data;	
 	printf("Enter the WORD that you want to search: ");
@@ -84,6 +86,8 @@ int init_search()
 	search_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
 	search_data.meaning = "";
 	search_data.flag = SEARCH_OP;
+	insert_data.clnt_no = CLIENT_ID;
+	insert_data.clock = timestamp;
 	search_result_data = operation_execute_1(&search_data, cl);
 	if(search_result_data == NULL || search_result_data->flag == FAIL)
 		printf("\nSorry the word not found!!!\n");
@@ -93,11 +97,11 @@ int init_search()
 
 //sends and recieve insert data
 int init_insert()
-{       char *x = NULL, *y =NULL;
+{       
+	char *x = NULL, *y =NULL;
 	char c;
-   
-	
 	dict_data *insert_result_data , insert_data = {"","",0};
+	setTimeStamp();
 	do
 	{
 		printf("PLease enter the word: ");
@@ -120,8 +124,10 @@ int init_insert()
 	}while(1);
 	
 	insert_data.word = verifyAndToSmall(x, strlen(x));
-	insert_data.meaning =verifyAndToSmall(y, strlen(y));
+	insert_data.meaning = verifyAndToSmall(y, strlen(y));
 	insert_data.flag = INSERT_OP;
+	insert_data.clnt_no = CLIENT_ID;
+	insert_data.clock = timestamp;
 	insert_result_data = operation_execute_1(&insert_data, cl);
 	if(insert_result_data != NULL && insert_result_data->flag == SUCCESS)
 	{
@@ -139,6 +145,7 @@ int init_delete()
 	char *Q_word = NULL;
 	int flag = 0;
 	dict_data delete_data , *delete_result_data;
+	setTimeStamp();
 	printf("Enter the WORD that you want to search: ");
 	Q_word = readinput();
 	delete_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
@@ -161,6 +168,16 @@ int init_delete()
 	printf("\n DELETION SUCESSFUL: %4s \n \n", (delete_result_data ->flag)? "Done":"Fail");
 }
 
+void setTimeStamp()
+{
+	printf("Enter the time vector:\n");
+	for(int i=0; i<3; i++)
+	{
+		printf("\n Value for Client %d:", i+1);
+		scanf("%1d", timestamp + i);
+		flushBuffer();
+	}
+}
 
 int showMenu(){
 	enum OP {SEARCH = 1, INSERT, DELETE, EXIT};
@@ -173,8 +190,7 @@ int showMenu(){
 	is_stdin_empty = scanf ("%d",&usr_inp);
 	//check if the scanf failed	
 	flushBuffer();
-	is_stdin_empty = 0;
-	
+	is_stdin_empty = 0;	
 
 	switch(usr_inp)
 	{

@@ -11,6 +11,7 @@
 
 #define FAIL  0
 #define SUCCESS 1
+#define FILEPATH "dictionary.txt"
 
 
 
@@ -115,8 +116,59 @@ int deletion(char* key)
 }
 
 
+void flush_to_file()
+{
+	//open the database file
+	struct node *read_pointer;
+	FILE *db = fopen(FILEPATH, "w");
+	for(int i=0; i<26; i++)
+	{
+		read_pointer = dict_index[i];
+		while(read_pointer != NULL)
+		{
+			//format of the entry will be <word:meaning>
+			fputs(read_pointer->word,db);
+			fputc('\n',db);
+			fputs(read_pointer->meaning, db);
+			fputc('\n',db);
+			read_pointer = read_pointer->next;
+		}
+	}
+	fclose(db);
+}
 
+void load_from_file()
+{
+	char buffer[200];
+	int toggler =0, len = 0;
+	char *word, *meaning;
+	FILE *db = fopen(FILEPATH, "r");
+	while(fgets((buffer), 200, db) != NULL)
+	{
+		len = strlen(buffer);
+		buffer[len-1] = '\0';
+		if(!toggler)//word
+		{
+			word = (char *) malloc(len);
+			strcpy(word, buffer);
+			
+		}else//meaning
+		{
+			meaning = (char *) malloc(len);
+			strcpy(meaning, buffer);
+			insert (word, meaning);
+			free(word);
+			free(meaning);
+		}
+		toggler ^=1;
+	}
+	fclose(db);
+}
 
+void verify_timestamp()
+{
+
+}
 
 dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst)
 {
