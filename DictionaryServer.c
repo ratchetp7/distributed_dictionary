@@ -14,6 +14,7 @@
 #define INVALID -1
 #define PENDING -2
 #define FILEPATH "dictionary.txt"
+#define CLIENTFILEPATH "client"
 
 struct node
 {
@@ -28,12 +29,16 @@ typedef struct buffer_item
 	char *meaning;
 	int *tv;
 	int clnt_no;
+	int flag;
 	struct buffer_item *next;
+	
 };
 
 
 struct node *dict_index [26];
 buffer_item wait_buffer_head, wait_buffer_tail;
+
+enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 
 
 int vector_clock[3] = {0,0,0};
@@ -168,6 +173,7 @@ int deletion(char* key)
 }
 
 
+/*
 void flush_to_file()
 {
 	//open the database file
@@ -215,11 +221,67 @@ void load_from_file()
 		toggler ^=1;
 	}
 	fclose(db);
-}
+}*/
+int log_event (buffer_item *current, dict_data *node, char *operation)
+{
+	char *filename = (char *) malloc(sizeof(char)*12); //for the format "client<no>.txt"
+	strcpy(filename, CLIENTFILEPATH);
+	if (buffer_item ==NULL)
+	{
+		strcat(filename, something_node -> clnt_no);
+		strcat(filename, ".txt");
+		client_file = fopen(filename,"a");
+		fputs(operation)
+		
+	}
+	else
+	{
+		
+	}
 
+}
 int execute_pending_operation(buffer_item *current)
 {
-	switch(current -> )
+	char *updated_meaning, *temp;
+	FILE *client_file;
+	switch(current -> flag)
+	{
+		case INSERT: 
+				temp = linearSearch(node_arg->word);
+				if(strcmp(temp, "") == 0)			 //the word is not present
+				{         
+					updated_meaning = (char *) malloc(sizeof(strlen(node_arg->meaning))+1);
+					strcpy(updated_meaning,node_arg->meaning);
+				}
+				else					
+				{
+					updated_meaning = (char *) malloc(sizeof(temp)+sizeof(node_arg->meaning)+3);//add 3 for ", " and '0/'
+					strcpy(updated_meaning,temp);
+					strcat(updated_meaning,", ");
+					strcat(updated_meaning,node_arg->meaning);
+					deletion(node_arg->word); // delete the old node after insertion of the new				
+				}
+				free(updated_meaning);			
+				break;
+				
+		case SEARCH:
+				result_data.meaning = linearSearch(node_arg->word);
+				if(strcmp(result_data.meaning,"") == 0) //sending fail flag
+				{
+					char *filename = (char *) malloc(sizeof(char)*12); //for the format "client<no>.txt"
+					strcpy(filename, CLIENTFILEPATH);
+					strcat(filename, current -> clnt_no);
+					strcat(filename, ".txt");
+					client_file = fopen(filename,"a");
+					puts
+				}
+				else	
+				{
+					result_data.word =  "";//->word);
+					result_data.flag = SUCCESS;
+				}
+				break;
+	}
 }
 
 int check_pending_operations()
@@ -248,7 +310,6 @@ int check_pending_operations()
 }
 dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst)
 {
-	enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 	static dict_data result_data;
 	char  *updated_meaning, *temp;
 	int should_wait = 0;
@@ -338,6 +399,7 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 			item->meaning = (char*)malloc(sizeof(node_arg->meaning) + 1);
 			strcpy(item->meaning, node_arg->meaning);
 			item->tv = (int*)malloc(3*sizeof(int));
+			item -> flag = node_arg ->flag;
 			for(int j = 0; j<3; j++)
 				(item->tv)[j] = *(node_arg->clock + j);
 			
