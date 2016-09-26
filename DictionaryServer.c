@@ -12,16 +12,8 @@
 #define FAIL  0
 #define SUCCESS 1
 #define INVALID -1
+#define PENDING -2
 #define FILEPATH "dictionary.txt"
-
-
-
-struct node *dict_index [26];
-struct dict_data *wait_buffer;
-
-
-int vector_clock[3] = {0,0,0};
-int buffer_length = 0;
 
 struct node
 {
@@ -29,6 +21,24 @@ struct node
   char *meaning;
   struct node *next;
 };
+
+typedef struct buffer_item
+{
+	char *word;
+	char *meaning;
+	int *tv;
+	int clnt_no;
+	struct buffer_item *next;
+};
+
+
+struct node *dict_index [26];
+buffer_item wait_buffer_head, wait_buffer_tail;
+
+
+int vector_clock[3] = {0,0,0};
+int buffer_length = 0;
+
 
 int timestamp_compare(*tv_1, *tv_2)
 	int *tv_1, int *tv_2
@@ -55,8 +65,10 @@ int timestamp_compare(*tv_1, *tv_2)
 int is_timestamp_valid (timestamp)
 	int* timestamp
 {
-	struct dict_data *scanner = wait_buffer;
-	while(scanner != NULL)
+	if(!timestamp_compare(vector_clock, timestamp))
+		return 0;
+	buffer_item *scanner = wait_buffer_head;
+	while(scanner != wait_buffer_tail)
 	{
 		if(!timestamp_compare(scanner->clock, timestamp));
 			return 0;
@@ -205,12 +217,41 @@ void load_from_file()
 	fclose(db);
 }
 
+int execute_pending_operation(buffer_item *current)
+{
+	switch(current -> )
+}
 
+int check_pending_operations()
+{
+	buffer_item *current = wait_buffer_head;
+	while(current != wait_buffer_tail)
+	{
+		for(int i = 0; i<3 ;i++)
+		{
+			if(i == current -> clnt_no - 1)
+			{
+				if((current -> clock)[i] != vector_clock [i] - 1)
+					break;				
+			}
+			else
+			{
+				if((current -> clock)[i] > vector_clock [i])
+					break;
+			}	
+		}
+		//execute the operation
+		execute_pending_operation(current);
+		buffer_length--;
+		current = current->next;	
+	}
+}
 dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst)
 {
 	enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 	static dict_data result_data;
 	char  *updated_meaning, *temp;
+	int should_wait = 0;
 	
 	//verify the timestamps validity
 	if(is_timestamp_valid(node_arg -> clock))
@@ -219,13 +260,19 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		//else add it to the wait_buffer
 		for(int i = 0; i<3 ;i++)
 		{
-			if(i == node_arg -> clnt_no)
+			if(i == node_arg -> clnt_no - 1)
+			{
 				if((node_arg -> clock)[i] != vector_clock [i] - 1)
-				{
-					//make it wait
-				}
+					should_wait = 1;				
+			}
+			else
+			{
+				if((node_arg -> clock)[i] > vector_clock [i])
+					should_wait = 1;
+			}	
 		}
 		
+		if(!should_wait)
 		{
 			switch(node_arg->flag)
 			{
@@ -279,6 +326,29 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							}				
 							break;  				
 			}//switch end
+			++vector_clock[node_arg -> clnt_no];
+			
+			
+		}
+		else
+		{
+			buffer_item item = (buffer_item *)malloc(sizeof(buffer_item));
+			item->word = (char*)malloc(sizeof(node_arg->word) + 1);
+			strcpy(item->word, node_arg->word);
+			item->meaning = (char*)malloc(sizeof(node_arg->meaning) + 1);
+			strcpy(item->meaning, node_arg->meaning);
+			item->tv = (int*)malloc(3*sizeof(int));
+			for(int j = 0; j<3; j++)
+				(item->tv)[j] = *(node_arg->clock + j);
+			
+			//add to the wait_buffer
+			node-> next = wait_buffer_tail -> next;
+			wait_buffer_tail -> next = node;
+			wait_buffer_tail = wait_buffer_tail -> next;	
+			result_data.word="";
+			result_data.meaning = "";
+			result_data.flag = PENDING;
+			buffer_length++;
 		}
 	}
 	else //when timestamp in the message is not valid
@@ -286,8 +356,6 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		result_data.word="";
 		result_data.meaning = "";
 		result_data.flag = INVALID;
-		result_data.clock = NULL;
-		result_data.client_no = node_arg->client_no;
 	}
 
 
