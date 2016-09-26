@@ -27,6 +27,23 @@ int flushBuffer()
 	is_stdin_empty = 1;
 }
 
+void setTimeStamp()
+{
+	printf("Enter the time vector:\n");
+	for(int i=0; i<3; i++)
+	{
+		printf("\n Value for Client %d:", i+1);
+		scanf("%d", timestamp + i);
+		printf("\n%d\n", timestamp[i]);
+		is_stdin_empty = 0;
+		flushBuffer(); 
+		if(timestamp[i] < 0 && timestamp[i] > 10)
+		{
+			printf("\nPlease Enter a Valid value!!!\n");
+			i--;
+		}
+	}
+}
 
 //read input into variable length strings
 char* readinput()
@@ -80,7 +97,7 @@ int init_search()
 	char *Q_word = NULL;
 	setTimeStamp();
 	dict_data search_data = {"","",0};
-	dict_data *search_result_data;	
+	dict_data *search_result_data, insert_data;	
 	printf("Enter the WORD that you want to search: ");
 	Q_word = readinput();
 	search_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
@@ -168,16 +185,6 @@ int init_delete()
 	printf("\n DELETION SUCESSFUL: %4s \n \n", (delete_result_data ->flag)? "Done":"Fail");
 }
 
-void setTimeStamp()
-{
-	printf("Enter the time vector:\n");
-	for(int i=0; i<3; i++)
-	{
-		printf("\n Value for Client %d:", i+1);
-		scanf("%1d", timestamp + i);
-		flushBuffer();
-	}
-}
 
 int showMenu(){
 	enum OP {SEARCH = 1, INSERT, DELETE, EXIT};
@@ -187,7 +194,7 @@ int showMenu(){
 	printf("1. Search a word, or \n2. Insert new word-meaning, or \n3. Delete a word \n4. Enough of this \n");
 	printf("Your Choice please - ");
 
-	is_stdin_empty = scanf ("%d",&usr_inp);
+	is_stdin_empty = scanf ("%1d",&usr_inp);
 	//check if the scanf failed	
 	flushBuffer();
 	is_stdin_empty = 0;	

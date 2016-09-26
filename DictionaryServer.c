@@ -11,11 +11,17 @@
 
 #define FAIL  0
 #define SUCCESS 1
+#define INVALID -1
 #define FILEPATH "dictionary.txt"
 
 
 
 struct node *dict_index [26];
+struct dict_data *wait_buffer;
+
+
+int vector_clock[3] = {0,0,0};
+int buffer_length = 0;
 
 struct node
 {
@@ -24,10 +30,44 @@ struct node
   struct node *next;
 };
 
+int timestamp_compare(*tv_1, *tv_2)
+	int *tv_1, int *tv_2
+{
+	int gt = 0, lt = 0;
+	for(int i = 0, i<3 , i++)
+	{
+		if (tv_1[i] < tv_2[i])
+			gt++;
+		else 
+		if(tv_1[i] > tv_2[i])
+			lt++;
+				
+	}
+	if(((gt > 0) && (lt > 0)) || ((gt == 0) && (lt == 0)))
+		return 0;
+	if(lt > 0)
+		return -1;
+	return 1;
+		
+}
+
+
+int is_timestamp_valid (timestamp)
+	int* timestamp
+{
+	struct dict_data *scanner = wait_buffer;
+	while(scanner != NULL)
+	{
+		if(!timestamp_compare(scanner->clock, timestamp));
+			return 0;
+		scanner = scanner->next;
+	}
+	return 1;
+}
+
 
 int insert (char* word1 , char* meaning1) //insert new node in the list
 {
-	
 	 int temp = word1[0];
 	 int q = temp-97; 
 	struct node *new_node, *current;
@@ -165,68 +205,90 @@ void load_from_file()
 	fclose(db);
 }
 
-void verify_timestamp()
-{
-
-}
 
 dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst)
 {
 	enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 	static dict_data result_data;
 	char  *updated_meaning, *temp;
-	switch(node_arg->flag)
-	{
-		//case insert searches for an existing entry, if not found then 
-		//make a new entry then add it else append the new meaning 
-		//to existing meaning and add new entry to the table and delete old word-meaning pair
-		case INSERT:    
-				temp = linearSearch(node_arg->word);
-				if(strcmp(temp, "") == 0)			 //the word is not present
-				{         
-					updated_meaning = (char *) malloc(sizeof(strlen(node_arg->meaning))+1);
-					strcpy(updated_meaning,node_arg->meaning);
-				}
-				else					
+	
+	//verify the timestamps validity
+	if(is_timestamp_valid(node_arg -> clock))
+	{	
+		//check if the operation is apt to be executed now
+		//else add it to the wait_buffer
+		for(int i = 0; i<3 ;i++)
+		{
+			if(i == node_arg -> clnt_no)
+				if((node_arg -> clock)[i] != vector_clock [i] - 1)
 				{
-					updated_meaning = (char *) malloc(sizeof(temp)+sizeof(node_arg->meaning)+3);//add 3 for ", " and '0/'
-					strcpy(updated_meaning,temp);
-					strcat(updated_meaning,", ");
-					strcat(updated_meaning,node_arg->meaning);
-					deletion(node_arg->word); // delete the old node after insertion of the new				
+					//make it wait
 				}
+		}
+		
+		{
+			switch(node_arg->flag)
+			{
+				//case insert searches for an existing entry, if not found then 
+				//make a new entry then add it else append the new meaning 
+				//to existing meaning and add new entry to the table and delete old word-meaning pair
+				case INSERT:    
+						temp = linearSearch(node_arg->word);
+						if(strcmp(temp, "") == 0)			 //the word is not present
+						{         
+							updated_meaning = (char *) malloc(sizeof(strlen(node_arg->meaning))+1);
+							strcpy(updated_meaning,node_arg->meaning);
+						}
+						else					
+						{
+							updated_meaning = (char *) malloc(sizeof(temp)+sizeof(node_arg->meaning)+3);//add 3 for ", " and '0/'
+							strcpy(updated_meaning,temp);
+							strcat(updated_meaning,", ");
+							strcat(updated_meaning,node_arg->meaning);
+							deletion(node_arg->word); // delete the old node after insertion of the new				
+						}
 
-				if(insert(node_arg->word, updated_meaning))
-				{
-					result_data.word="";
-					result_data.meaning = "";
-					result_data.flag = SUCCESS;
+						if(insert(node_arg->word, updated_meaning))
+						{
+							result_data.word="";
+							result_data.meaning = "";
+							result_data.flag = SUCCESS;
 					
-				}	
-				free(updated_meaning);			
-				break;
+						}	
+						free(updated_meaning);			
+						break;
 
-		case SEARCH:DELETE:	result_data.meaning = linearSearch(node_arg->word);
-				        if(strcmp(result_data.meaning,"") == 0) //sending fail flag
-					{
-						result_data.word = "";
-						result_data.flag = FAIL;
-					}
-					else	
-					{
-						result_data.word =  "";//->word);
-						result_data.flag = SUCCESS;
-					}
-					break;
-		 
-		case CONFIRM_DELETE:    if(deletion(node_arg->word))
-					{
-						result_data.word  = "";
-						result_data.meaning = "";
-						result_data.flag = SUCCESS;
-					}				
-					break;  				
-	}//switch end
+				case SEARCH:DELETE:	result_data.meaning = linearSearch(node_arg->word);
+							if(strcmp(result_data.meaning,"") == 0) //sending fail flag
+							{
+								result_data.word = "";
+								result_data.flag = FAIL;
+							}
+							else	
+							{
+								result_data.word =  "";//->word);
+								result_data.flag = SUCCESS;
+							}
+							break;
+				 
+				case CONFIRM_DELETE:    if(deletion(node_arg->word))
+							{
+								result_data.word  = "";
+								result_data.meaning = "";
+								result_data.flag = SUCCESS;
+							}				
+							break;  				
+			}//switch end
+		}
+	}
+	else //when timestamp in the message is not valid
+	{
+		result_data.word="";
+		result_data.meaning = "";
+		result_data.flag = INVALID;
+		result_data.clock = NULL;
+		result_data.client_no = node_arg->client_no;
+	}
 
 
 	//return the result
