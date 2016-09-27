@@ -12,12 +12,14 @@
 #define CONFIRM_DELETE_OP 5
 #define CHUNK 50
 #define CLIENT_ID 1
+#define INVALID -1
+#define PENDING -2
 
 
 CLIENT *cl;
 int is_stdin_empty = 0;
 int timestamp[3];
-
+int result_flag ( dict_data *result_data , char* operation);
 //custom function to flush the stdin stream
 int flushBuffer()                                                   
 {	
@@ -106,10 +108,12 @@ int init_search()
 	insert_data.clnt_no = CLIENT_ID;
 	insert_data.clock = timestamp;
 	search_result_data = operation_execute_1(&search_data, cl);
-	if(search_result_data == NULL || search_result_data->flag == FAIL)
-		printf("\nSorry the word not found!!!\n");
-	else
-		printf("\nThe meaning for your word %s is %s \n \n", search_result_data->word ,search_result_data->meaning);
+	//if(search_result_data == NULL || search_result_data->flag == FAIL)
+	//	printf("\nSorry the word not found!!!\n");
+	//else
+	//	printf("\nThe meaning for your word %s is %s \n \n", search_result_data->word ,search_result_data->meaning);
+	result_flag(search_result_data , "Search");
+	printf("\nThe meaning for your word %s is %s \n \n", search_result_data->word ,search_result_data->meaning);
 }
 
 //sends and recieve insert data
@@ -146,13 +150,14 @@ int init_insert()
 	insert_data.clnt_no = CLIENT_ID;
 	insert_data.clock = timestamp;
 	insert_result_data = operation_execute_1(&insert_data, cl);
-	if(insert_result_data != NULL && insert_result_data->flag == SUCCESS)
-	{
-		printf("\nOperation Successful!!!\n \n");
-		printf("\nInserted word %s meaning %s", insert_data.word,insert_data.meaning);
-	}
-	else
-		printf("\nOperation Failed!!! \n \n");
+	//if(insert_result_data != NULL && insert_result_data->flag == SUCCESS)
+	//{
+	//	printf("\nOperation Successful!!!\n \n");
+	//	printf("\nInserted word %s meaning %s", insert_data.word,insert_data.meaning);
+	//}
+	//else
+	//	printf("\nOperation Failed!!! \n \n");
+	result_flag(insert_result_data, "Insert");
 }
 
 //sends and receive data to be deleted
@@ -167,9 +172,9 @@ int init_delete()
 	Q_word = readinput();
 	delete_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
 	delete_data.meaning = "";
-	delete_data.flag = DELETE_OP;
+	delete_data.flag = CONFIRM_DELETE_OP;
 	delete_result_data = operation_execute_1(&delete_data, cl);
-	if(delete_result_data == NULL || delete_result_data->flag != SUCCESS)
+	/*if(delete_result_data == NULL || delete_result_data->flag != SUCCESS)
 	{			
 		printf("\nSorry Word Not found!!!\n");	
 		return 0;
@@ -182,7 +187,9 @@ int init_delete()
 	if(flag!=0)
 		delete_data.flag = CONFIRM_DELETE_OP;
 	delete_result_data = operation_execute_1(&delete_data, cl);
-	printf("\n DELETION SUCESSFUL: %4s \n \n", (delete_result_data ->flag)? "Done":"Fail");
+	
+	printf("\n DELETION SUCESSFUL: %4s \n \n", (delete_result_data ->flag)? "Done":"Fail");*/
+	result_flag(delete_result_data , "Delete");
 }
 
 
@@ -229,4 +236,18 @@ int main (int argc, char **argv)
 
 	return 1;
 }
-
+int result_flag ( dict_data *result_data , char* operation)
+{
+	switch(result_data->flag)
+	{
+		case FAIL: printf("\n %s Failed!!!\n \n " , operation);
+			break;
+		case SUCCESS: printf("\n %s Successful!!!\n \n " , operation);
+			break;
+		case PENDING: printf("\n %s Pending!!!\n \n " , operation);
+			break;
+		case INVALID: printf("\n The Vector timestam is INVALID!!!\n \n " );
+			break;
+	}
+	return 0;
+}

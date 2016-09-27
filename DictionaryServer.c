@@ -23,7 +23,7 @@ struct node
   struct node *next;
 };
 
-typedef struct buffer_item
+struct buffer_item
 {
 	char *word;
 	char *meaning;
@@ -36,7 +36,7 @@ typedef struct buffer_item
 
 
 struct node *dict_index [26];
-buffer_item wait_buffer_head, wait_buffer_tail;
+struct buffer_item *wait_buffer_head, *wait_buffer_tail;
 
 enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 
@@ -45,11 +45,10 @@ int vector_clock[3] = {0,0,0};
 int buffer_length = 0;
 
 
-int timestamp_compare(*tv_1, *tv_2)
-	int *tv_1, int *tv_2
+int timestamp_compare(int *tv_1, int *tv_2)
 {
 	int gt = 0, lt = 0;
-	for(int i = 0, i<3 , i++)
+	for(int i = 0; i < 3 ; i++)
 	{
 		if (tv_1[i] < tv_2[i])
 			gt++;
@@ -58,24 +57,25 @@ int timestamp_compare(*tv_1, *tv_2)
 			lt++;
 				
 	}
+	
 	if(((gt > 0) && (lt > 0)) || ((gt == 0) && (lt == 0)))
 		return 0;
 	if(lt > 0)
 		return -1;
 	return 1;
-		
 }
 
 
-int is_timestamp_valid (timestamp)
-	int* timestamp
+int is_timestamp_valid (int *timestamp)
 {
 	if(!timestamp_compare(vector_clock, timestamp))
+	{
 		return 0;
-	buffer_item *scanner = wait_buffer_head;
+	}
+	struct buffer_item *scanner = wait_buffer_head;
 	while(scanner != wait_buffer_tail)
 	{
-		if(!timestamp_compare(scanner->clock, timestamp));
+		if(!timestamp_compare(scanner->tv, timestamp));
 			return 0;
 		scanner = scanner->next;
 	}
@@ -85,8 +85,8 @@ int is_timestamp_valid (timestamp)
 
 int insert (char* word1 , char* meaning1) //insert new node in the list
 {
-	 int temp = word1[0];
-	 int q = temp-97; 
+	int temp = word1[0];
+	int q = temp-97; 
 	struct node *new_node, *current;
 	
 	new_node = (struct node*) malloc(sizeof(struct node));
@@ -110,8 +110,7 @@ int insert (char* word1 , char* meaning1) //insert new node in the list
 	 	    }
 			current->next = new_node;
 		 }    
-		
-	     return SUCCESS;
+		 return SUCCESS;
 }
 
 
@@ -141,7 +140,7 @@ int deletion(char* key)
 		
 	while (target_node != NULL)       
 		if( strcmp(target_node->word,key) == 0)//word found
-			break;
+			{break;}
 		else
 		{
 			prev_node = target_node;			
@@ -154,7 +153,6 @@ int deletion(char* key)
 	//if word not found then return fail	
 	if (target_node == NULL)       
 		return FAIL;
-	
 
 	//check if the first node in the list is the target_node
 	if (prev_node == NULL)
@@ -169,7 +167,6 @@ int deletion(char* key)
 	free(target_node->meaning);
 	free (target_node);
 	return SUCCESS;
-	
 }
 
 
@@ -222,83 +219,83 @@ void load_from_file()
 	}
 	fclose(db);
 }*/
-int log_event (buffer_item *current, dict_data *node, char *operation)
+
+int log_event (char *word, char* meaning, char *operation, int client_id)
 {
+	FILE *client_file;
 	char *filename = (char *) malloc(sizeof(char)*12); //for the format "client<no>.txt"
 	strcpy(filename, CLIENTFILEPATH);
-	if (buffer_item ==NULL)
-	{
-		strcat(filename, something_node -> clnt_no);
-		strcat(filename, ".txt");
-		client_file = fopen(filename,"a");
-		fputs(operation)
-		
-	}
-	else
-	{
-		
-	}
-
+	filename[6] = client_id;
+	filename[7] = '\0';
+	strcat(filename, ".txt");
+	client_file = fopen(filename,"a");
+	fputs(operation,client_file);
+	fputs(". ",client_file);
+	fputs(word,client_file);
+	fputs(": ",client_file);
+	fputs(meaning,client_file);
+	fputs("\n",client_file);
+	free(filename);
+	fclose(client_file);
 }
-int execute_pending_operation(buffer_item *current)
+
+
+int execute_pending_operation(struct buffer_item *current)
 {
 	char *updated_meaning, *temp;
-	FILE *client_file;
 	switch(current -> flag)
 	{
 		case INSERT: 
-				temp = linearSearch(node_arg->word);
+				temp = linearSearch(current->word);
 				if(strcmp(temp, "") == 0)			 //the word is not present
 				{         
-					updated_meaning = (char *) malloc(sizeof(strlen(node_arg->meaning))+1);
-					strcpy(updated_meaning,node_arg->meaning);
+					updated_meaning = (char *) malloc(sizeof(strlen(current->meaning))+1);
+					strcpy(updated_meaning,current->meaning);
 				}
 				else					
 				{
-					updated_meaning = (char *) malloc(sizeof(temp)+sizeof(node_arg->meaning)+3);//add 3 for ", " and '0/'
+					updated_meaning = (char *) malloc(sizeof(temp)+sizeof(current->meaning)+3);//add 3 for ", " and '0/'
 					strcpy(updated_meaning,temp);
 					strcat(updated_meaning,", ");
-					strcat(updated_meaning,node_arg->meaning);
-					deletion(node_arg->word); // delete the old node after insertion of the new				
+					strcat(updated_meaning,current->meaning);
+					deletion(current->word); // delete the old node after insertion of the new				
 				}
+				log_event(current->word, updated_meaning, "Insertion", current->	clnt_no);
 				free(updated_meaning);			
 				break;
 				
 		case SEARCH:
-				result_data.meaning = linearSearch(node_arg->word);
-				if(strcmp(result_data.meaning,"") == 0) //sending fail flag
-				{
-					char *filename = (char *) malloc(sizeof(char)*12); //for the format "client<no>.txt"
-					strcpy(filename, CLIENTFILEPATH);
-					strcat(filename, current -> clnt_no);
-					strcat(filename, ".txt");
-					client_file = fopen(filename,"a");
-					puts
-				}
+				temp = linearSearch(current->word);
+				if(strcmp(temp,"") == 0) //sending fail flag
+					log_event(current->word, "Not Found", "Search", current->clnt_no);
 				else	
-				{
-					result_data.word =  "";//->word);
-					result_data.flag = SUCCESS;
-				}
+					log_event(current->word, temp, "Search", current->clnt_no);
+				break;
+		
+		case CONFIRM_DELETE: 
+				if(deletion(current->word))
+					log_event(current->word, "Successfully Deleted", "Delete", current->clnt_no);
+				else	
+					log_event(current->word, "Not Found", "Delete", current->clnt_no);
 				break;
 	}
 }
 
 int check_pending_operations()
 {
-	buffer_item *current = wait_buffer_head;
+	struct buffer_item *current = wait_buffer_head;
 	while(current != wait_buffer_tail)
 	{
 		for(int i = 0; i<3 ;i++)
 		{
-			if(i == current -> clnt_no - 1)
+			if(i == current->clnt_no - 1)
 			{
-				if((current -> clock)[i] != vector_clock [i] - 1)
+				if((current -> tv)[i] != vector_clock [i] - 1)
 					break;				
 			}
 			else
 			{
-				if((current -> clock)[i] > vector_clock [i])
+				if((current -> tv)[i] > vector_clock [i])
 					break;
 			}	
 		}
@@ -308,6 +305,7 @@ int check_pending_operations()
 		current = current->next;	
 	}
 }
+
 dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst)
 {
 	static dict_data result_data;
@@ -388,12 +386,10 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							break;  				
 			}//switch end
 			++vector_clock[node_arg -> clnt_no];
-			
-			
 		}
 		else
 		{
-			buffer_item item = (buffer_item *)malloc(sizeof(buffer_item));
+			struct buffer_item *item = (struct buffer_item *)malloc(sizeof(struct buffer_item));
 			item->word = (char*)malloc(sizeof(node_arg->word) + 1);
 			strcpy(item->word, node_arg->word);
 			item->meaning = (char*)malloc(sizeof(node_arg->meaning) + 1);
@@ -404,9 +400,9 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 				(item->tv)[j] = *(node_arg->clock + j);
 			
 			//add to the wait_buffer
-			node-> next = wait_buffer_tail -> next;
-			wait_buffer_tail -> next = node;
-			wait_buffer_tail = wait_buffer_tail -> next;	
+			item -> next = wait_buffer_tail -> next;
+			wait_buffer_tail -> next = item;
+			wait_buffer_tail = item;	
 			result_data.word="";
 			result_data.meaning = "";
 			result_data.flag = PENDING;
@@ -419,7 +415,6 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		result_data.meaning = "";
 		result_data.flag = INVALID;
 	}
-
 
 	//return the result
 	return (&result_data);
