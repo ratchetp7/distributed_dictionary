@@ -2,6 +2,8 @@ struct dict_data{
 	string word<>;
 	string meaning<>;
 	int flag;
+	int *clock;
+	int clnt_no;
 };
 program DICTIONARY_PROG { 
 	version DICTIONARY_VERS { 
