@@ -36,7 +36,7 @@ struct buffer_item
 
 
 struct node *dict_index [26];
-struct buffer_item *wait_buffer_head, *wait_buffer_tail;
+struct buffer_item *wait_buffer_head = NULL, *wait_buffer_tail =NULL;
 
 enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 
@@ -73,9 +73,9 @@ int is_timestamp_valid (int *timestamp)
 		return 0;
 	}
 	struct buffer_item *scanner = wait_buffer_head;
-	while(scanner != wait_buffer_tail)
+	while(scanner != wait_buffer_head)
 	{
-		if(!timestamp_compare(scanner->tv, timestamp));
+		if(timestamp_compare(scanner->tv, timestamp) == 0);
 			return 0;
 		scanner = scanner->next;
 	}
@@ -311,7 +311,6 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 	static dict_data result_data;
 	char  *updated_meaning, *temp;
 	int should_wait = 0;
-	
 	//verify the timestamps validity
 	if(is_timestamp_valid(node_arg -> clock))
 	{	
@@ -321,7 +320,7 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		{
 			if(i == node_arg -> clnt_no - 1)
 			{
-				if((node_arg -> clock)[i] != vector_clock [i] - 1)
+				if((node_arg -> clock)[i] - 1 != vector_clock [i])
 					should_wait = 1;				
 			}
 			else
@@ -385,11 +384,13 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							}				
 							break;  				
 			}//switch end
-			++vector_clock[node_arg -> clnt_no];
+			++(vector_clock[node_arg -> clnt_no -1]);
+			check_pending_operations();
+			printf("Vector Clock updated to %d %d %d", vector_clock[0],vector_clock[1],vector_clock[2]);
 		}
 		else
 		{
-			struct buffer_item *item = (struct buffer_item *)malloc(sizeof(struct buffer_item));
+			struct buffer_item *item = (struct buffer_item *) malloc(sizeof(struct buffer_item));
 			item->word = (char*)malloc(sizeof(node_arg->word) + 1);
 			strcpy(item->word, node_arg->word);
 			item->meaning = (char*)malloc(sizeof(node_arg->meaning) + 1);
@@ -400,13 +401,38 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 				(item->tv)[j] = *(node_arg->clock + j);
 			
 			//add to the wait_buffer
-			item -> next = wait_buffer_tail -> next;
-			wait_buffer_tail -> next = item;
-			wait_buffer_tail = item;	
+			if(wait_buffer_head == NULL)//when list is empty
+			{
+				wait_buffer_head = item;
+				wait_buffer_tail = item;
+				item->next = wait_buffer_head;
+			}
+			else 
+			{
+				if(timestamp_compare(wait_buffer_head->tv, item -> tv) == -1)
+				{
+					item->next = wait_buffer_head;
+					wait_buffer_head = item;
+					wait_buffer_tail->next = item;
+				}
+				else //first find the correct position in the sorted list
+				{
+					struct buffer_item *search_pointer = wait_buffer_head;
+					while(timestamp_compare((search_pointer->next)->tv, item -> tv) == 1 )
+					{
+							search_pointer = search_pointer->next;
+					}
+					item -> next = search_pointer -> next;
+					search_pointer -> next = item;
+					if(search_pointer == wait_buffer_tail)
+						wait_buffer_tail = item;	
+					//print buffer contents
+				}
+			}
 			result_data.word="";
 			result_data.meaning = "";
 			result_data.flag = PENDING;
-			buffer_length++;
+			buffer_length++;	
 		}
 	}
 	else //when timestamp in the message is not valid
@@ -415,7 +441,7 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		result_data.meaning = "";
 		result_data.flag = INVALID;
 	}
-
+	printf("\n Recieved message from client:%d with timestamp %d, %d, %d",node_arg->clnt_no, node_arg -> clock[0],node_arg -> clock[1],node_arg -> clock[2]);
 	//return the result
 	return (&result_data);
 	

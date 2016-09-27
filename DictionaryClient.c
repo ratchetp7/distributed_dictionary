@@ -20,6 +20,8 @@ CLIENT *cl;
 int is_stdin_empty = 0;
 int timestamp[3];
 int result_flag ( dict_data *result_data , char* operation);
+
+struct timeval tvl;
 //custom function to flush the stdin stream
 int flushBuffer()                                                   
 {	
@@ -105,8 +107,8 @@ int init_search()
 	search_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
 	search_data.meaning = "";
 	search_data.flag = SEARCH_OP;
-	insert_data.clnt_no = CLIENT_ID;
-	insert_data.clock = timestamp;
+	search_data.clnt_no = CLIENT_ID;
+	search_data.clock = timestamp;
 	search_result_data = operation_execute_1(&search_data, cl);
 	//if(search_result_data == NULL || search_result_data->flag == FAIL)
 	//	printf("\nSorry the word not found!!!\n");
@@ -232,6 +234,8 @@ int main (int argc, char **argv)
 	 }
 	do{
 		cl = clnt_create(argv[1], DICTIONARY_PROG, DICTIONARY_VERS, "tcp");
+		tvl.tv_sec = 100;
+		clnt_control(cl, CLSET_TIMEOUT, (char *)&tvl);
 	}while(!showMenu());
 
 	return 1;
