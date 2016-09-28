@@ -16,7 +16,7 @@
 #define PENDING -2
 
 
-CLIENT *cl;
+CLIENT *cl1, *cl2;
 int is_stdin_empty = 0;
 int timestamp[3];
 int result_flag ( dict_data *result_data , char* operation);
@@ -37,15 +37,15 @@ void setTimeStamp()
 	for(int i=0; i<3; i++)
 	{
 		printf("\n Value for Client %d:", i+1);
-		scanf("%d", timestamp + i);
-		printf("\n%d\n", timestamp[i]);
-		is_stdin_empty = 0;
-		flushBuffer(); 
-		if(timestamp[i] < 0 && timestamp[i] > 10)
+		if(!scanf("%d", timestamp + i))
 		{
 			printf("\nPlease Enter a Valid value!!!\n");
 			i--;
 		}
+		printf("%d\n", timestamp[i]);
+		is_stdin_empty = 0;
+		flushBuffer(); 
+		
 	}
 }
 
@@ -109,13 +109,19 @@ int init_search()
 	search_data.flag = SEARCH_OP;
 	search_data.clnt_no = CLIENT_ID;
 	search_data.clock = timestamp;
-	search_result_data = operation_execute_1(&search_data, cl);
-	//if(search_result_data == NULL || search_result_data->flag == FAIL)
-	//	printf("\nSorry the word not found!!!\n");
-	//else
-	//	printf("\nThe meaning for your word %s is %s \n \n", search_result_data->word ,search_result_data->meaning);
+	search_result_data = operation_execute_1(&search_data, cl1);
 	result_flag(search_result_data , "Search");
-	printf("\nThe meaning for your word %s is %s \n \n", search_result_data->word ,search_result_data->meaning);
+	if(search_result_data != NULL && search_result_data->flag == SUCCESS)
+	{
+		printf("\nThe meaning for your word %s is %s on server 1\n \n ", search_result_data->word ,search_result_data->meaning);
+	}
+	search_result_data = operation_execute_1(&search_data, cl2);
+	result_flag(search_result_data , "Search");
+	if(search_result_data != NULL && search_result_data->flag == SUCCESS)
+	{
+		printf("\nThe meaning for your word %s is %s on server 2\n \n ", search_result_data->word ,search_result_data->meaning);
+	}
+	
 }
 
 //sends and recieve insert data
@@ -151,7 +157,12 @@ int init_insert()
 	insert_data.flag = INSERT_OP;
 	insert_data.clnt_no = CLIENT_ID;
 	insert_data.clock = timestamp;
-	insert_result_data = operation_execute_1(&insert_data, cl);
+	insert_result_data = operation_execute_1(&insert_data, cl1);
+	result_flag(insert_result_data, "Insert");
+	printf("on server 1\n");
+	insert_result_data = operation_execute_1(&insert_data, cl2);
+	result_flag(insert_result_data, "Insert");
+	printf("on server 2\n");
 	//if(insert_result_data != NULL && insert_result_data->flag == SUCCESS)
 	//{
 	//	printf("\nOperation Successful!!!\n \n");
@@ -159,7 +170,6 @@ int init_insert()
 	//}
 	//else
 	//	printf("\nOperation Failed!!! \n \n");
-	result_flag(insert_result_data, "Insert");
 }
 
 //sends and receive data to be deleted
@@ -175,7 +185,13 @@ int init_delete()
 	delete_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
 	delete_data.meaning = "";
 	delete_data.flag = CONFIRM_DELETE_OP;
-	delete_result_data = operation_execute_1(&delete_data, cl);
+	delete_result_data = operation_execute_1(&delete_data, cl1); //server 1
+	result_flag(delete_result_data , "Delete");
+	printf("on server 1\n");
+	delete_result_data = operation_execute_1(&delete_data, cl2); //server 2
+	result_flag(delete_result_data , "Delete");
+	printf("on server 2\n");
+	
 	/*if(delete_result_data == NULL || delete_result_data->flag != SUCCESS)
 	{			
 		printf("\nSorry Word Not found!!!\n");	
@@ -191,7 +207,7 @@ int init_delete()
 	delete_result_data = operation_execute_1(&delete_data, cl);
 	
 	printf("\n DELETION SUCESSFUL: %4s \n \n", (delete_result_data ->flag)? "Done":"Fail");*/
-	result_flag(delete_result_data , "Delete");
+	
 }
 
 
@@ -219,7 +235,9 @@ int showMenu(){
 		case EXIT: return 1;
 		default: printf("\nDUH!!! wrong choice \n");
 	}
-	clnt_destroy(cl);
+	clnt_destroy(cl1);
+	clnt_destroy(cl2);
+	
 	return 0;
 }
 
@@ -227,15 +245,23 @@ int showMenu(){
 int main (int argc, char **argv)
 {
 	dict_data temp;
-	if (argc !=2)
+	if (argc !=3)
 	 {	 
-		printf("\n format of the command is: client <localhost>");
+		printf("\n format of the command is: client <server1> <server2>");
 		exit (1);
 	 }
 	do{
-		cl = clnt_create(argv[1], DICTIONARY_PROG, DICTIONARY_VERS, "tcp");
+		cl1 = clnt_create(argv[1], DICTIONARY_PROG, DICTIONARY_VERS, "tcp");
 		tvl.tv_sec = 100;
-		clnt_control(cl, CLSET_TIMEOUT, (char *)&tvl);
+		clnt_control(cl1, CLSET_TIMEOUT, (char *)&tvl);
+		
+		cl2 = clnt_create(argv[2], DICTIONARY_PROG, DICTIONARY_VERS, "tcp");
+		clnt_control(cl2, CLSET_TIMEOUT, (char *)&tvl);
+		if(cl1 == NULL || cl2 == NULL)
+		{
+			printf("Connection error with servers!!!");
+			exit(0);
+		}
 	}while(!showMenu());
 
 	return 1;
@@ -244,13 +270,13 @@ int result_flag ( dict_data *result_data , char* operation)
 {
 	switch(result_data->flag)
 	{
-		case FAIL: printf("\n %s Failed!!!\n \n " , operation);
+		case FAIL: printf("\n%sFailed!!! " , operation);
 			break;
-		case SUCCESS: printf("\n %s Successful!!!\n \n " , operation);
+		case SUCCESS: printf("\n%s Successful!!! " , operation);
 			break;
-		case PENDING: printf("\n %s Pending!!!\n \n " , operation);
+		case PENDING: printf("\n%s Pending!!! " , operation);
 			break;
-		case INVALID: printf("\n The Vector timestam is INVALID!!!\n \n " );
+		case INVALID: printf("\nThe Vector timestamp is INVALID!!! " );
 			break;
 	}
 	return 0;

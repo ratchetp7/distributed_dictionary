@@ -36,7 +36,7 @@ struct buffer_item
 
 
 struct node *dict_index [26];
-struct buffer_item *wait_buffer_head = NULL, *wait_buffer_tail =NULL;
+struct buffer_item *wait_buffer_head = NULL;
 
 enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 
@@ -68,14 +68,14 @@ int timestamp_compare(int *tv_1, int *tv_2)
 
 int is_timestamp_valid (int *timestamp)
 {
-	if(!timestamp_compare(vector_clock, timestamp))
+	if(timestamp_compare(vector_clock, timestamp) < 1)
 	{
 		return 0;
 	}
 	struct buffer_item *scanner = wait_buffer_head;
-	while(scanner != wait_buffer_head)
+	while(scanner != NULL)
 	{
-		if(timestamp_compare(scanner->tv, timestamp) == 0);
+		if(timestamp_compare(scanner->tv, timestamp) == 0)
 			return 0;
 		scanner = scanner->next;
 	}
@@ -222,10 +222,10 @@ void load_from_file()
 
 int log_event (char *word, char* meaning, char *operation, int client_id)
 {
-	FILE *client_file;
+	FILE *client_file, *global_file;
 	char *filename = (char *) malloc(sizeof(char)*12); //for the format "client<no>.txt"
 	strcpy(filename, CLIENTFILEPATH);
-	filename[6] = client_id;
+	filename[6] = (char)(48+client_id);
 	filename[7] = '\0';
 	strcat(filename, ".txt");
 	client_file = fopen(filename,"a");
@@ -237,6 +237,19 @@ int log_event (char *word, char* meaning, char *operation, int client_id)
 	fputs("\n",client_file);
 	free(filename);
 	fclose(client_file);
+	
+	//write global log
+	global_file = fopen("Log.txt", "a");	
+	fputs("Client",global_file);
+	fputc((char)(48+client_id),global_file);
+	fputc('\t',global_file);
+	fputs(operation,global_file);
+	fputs(". ",global_file);
+	fputs(word,global_file);
+	fputs(": ",global_file);
+	fputs(meaning,global_file);
+	fputs("\n",global_file);
+	fclose(global_file);
 }
 
 
@@ -260,7 +273,7 @@ int execute_pending_operation(struct buffer_item *current)
 					strcat(updated_meaning,current->meaning);
 					deletion(current->word); // delete the old node after insertion of the new				
 				}
-				log_event(current->word, updated_meaning, "Insertion", current->	clnt_no);
+				log_event(current->word, updated_meaning, "Insertion", current->clnt_no);
 				free(updated_meaning);			
 				break;
 				
@@ -279,12 +292,13 @@ int execute_pending_operation(struct buffer_item *current)
 					log_event(current->word, "Not Found", "Delete", current->clnt_no);
 				break;
 	}
+	++(vector_clock[(current -> clnt_no) -1]);
 }
 
 int check_pending_operations()
 {
 	struct buffer_item *current = wait_buffer_head;
-	while(current != wait_buffer_tail)
+	while(current != NULL)
 	{
 		for(int i = 0; i<3 ;i++)
 		{
@@ -301,8 +315,13 @@ int check_pending_operations()
 		}
 		//execute the operation
 		execute_pending_operation(current);
-		buffer_length--;
-		current = current->next;	
+		wait_buffer_head = wait_buffer_head->next;
+		free(current->word);
+		free(current->meaning);
+		free(current->tv);
+		free(current);
+		current = wait_buffer_head;
+			
 	}
 }
 
@@ -360,7 +379,8 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							result_data.flag = SUCCESS;
 					
 						}	
-						free(updated_meaning);			
+						free(updated_meaning);		
+						log_event(node_arg->word, updated_meaning, "Insertion", node_arg->clnt_no);	
 						break;
 
 				case SEARCH:DELETE:	result_data.meaning = linearSearch(node_arg->word);
@@ -368,11 +388,13 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							{
 								result_data.word = "";
 								result_data.flag = FAIL;
+								log_event(node_arg->word, "Not Found", "Search", node_arg->clnt_no);
 							}
 							else	
 							{
 								result_data.word =  "";//->word);
 								result_data.flag = SUCCESS;
+								log_event(node_arg->word, temp, "Search", node_arg->clnt_no);
 							}
 							break;
 				 
@@ -381,10 +403,18 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 								result_data.word  = "";
 								result_data.meaning = "";
 								result_data.flag = SUCCESS;
-							}				
+								log_event(node_arg->word, "Successfully Deleted", "Delete", node_arg->clnt_no);
+							}	
+							else
+							{
+								log_event(node_arg->word, "Not Found", "Delete", node_arg->clnt_no);			
+								result_data.word  = "";
+								result_data.meaning = "";
+								result_data.flag = FAIL;
+							}
 							break;  				
 			}//switch end
-			++(vector_clock[node_arg -> clnt_no -1]);
+			++(vector_clock[(node_arg -> clnt_no) -1]);
 			check_pending_operations();
 			printf("Vector Clock updated to %d %d %d", vector_clock[0],vector_clock[1],vector_clock[2]);
 		}
@@ -397,6 +427,7 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 			strcpy(item->meaning, node_arg->meaning);
 			item->tv = (int*)malloc(3*sizeof(int));
 			item -> flag = node_arg ->flag;
+			item -> clnt_no = node_arg -> clnt_no;
 			for(int j = 0; j<3; j++)
 				(item->tv)[j] = *(node_arg->clock + j);
 			
@@ -404,8 +435,7 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 			if(wait_buffer_head == NULL)//when list is empty
 			{
 				wait_buffer_head = item;
-				wait_buffer_tail = item;
-				item->next = wait_buffer_head;
+				item->next = NULL;
 			}
 			else 
 			{
@@ -413,19 +443,16 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 				{
 					item->next = wait_buffer_head;
 					wait_buffer_head = item;
-					wait_buffer_tail->next = item;
 				}
 				else //first find the correct position in the sorted list
 				{
 					struct buffer_item *search_pointer = wait_buffer_head;
-					while(timestamp_compare((search_pointer->next)->tv, item -> tv) == 1 )
+					while(search_pointer->next != NULL && timestamp_compare((search_pointer->next)->tv, item -> tv) == 1 )
 					{
 							search_pointer = search_pointer->next;
 					}
 					item -> next = search_pointer -> next;
 					search_pointer -> next = item;
-					if(search_pointer == wait_buffer_tail)
-						wait_buffer_tail = item;	
 					//print buffer contents
 				}
 			}
