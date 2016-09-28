@@ -43,6 +43,7 @@ enum op_code {INSERT = 2, SEARCH, DELETE, CONFIRM_DELETE};
 
 int vector_clock[3] = {0,0,0};
 int buffer_length = 0;
+int first_run = 1;
 
 
 int timestamp_compare(int *tv_1, int *tv_2)
@@ -66,8 +67,12 @@ int timestamp_compare(int *tv_1, int *tv_2)
 }
 
 
-int is_timestamp_valid (int *timestamp)
+int is_timestamp_valid (int *timestamp, int clnt_no)
 {
+	if(vector_clock[clnt_no-1] >= timestamp[clnt_no - 1])
+	{
+		return 0;
+	}
 	if(timestamp_compare(vector_clock, timestamp) < 1)
 	{
 		return 0;
@@ -223,7 +228,7 @@ void load_from_file()
 int log_event (char *word, char* meaning, char *operation, int client_id)
 {
 	FILE *client_file, *global_file;
-	char *filename = (char *) malloc(sizeof(char)*12); //for the format "client<no>.txt"
+	char *filename = (char *) malloc(sizeof(char)*18); //for the format "logs/client<no>.txt"
 	strcpy(filename, CLIENTFILEPATH);
 	filename[6] = (char)(48+client_id);
 	filename[7] = '\0';
@@ -292,7 +297,10 @@ int execute_pending_operation(struct buffer_item *current)
 					log_event(current->word, "Not Found", "Delete", current->clnt_no);
 				break;
 	}
+	printf("\nExecuted operation from client:%d with timestamp %d, %d, %d",current->clnt_no, current -> tv[0],current -> tv[1],current -> tv[2]);
 	++(vector_clock[(current -> clnt_no) -1]);
+	printf("\nVector Clock updated to %d %d %d", vector_clock[0],vector_clock[1],vector_clock[2]);
+
 }
 
 int check_pending_operations()
@@ -304,13 +312,13 @@ int check_pending_operations()
 		{
 			if(i == current->clnt_no - 1)
 			{
-				if((current -> tv)[i] != vector_clock [i] - 1)
-					break;				
+				if((current -> tv)[i] -1 != vector_clock [i] )
+					return 0;				
 			}
 			else
 			{
 				if((current -> tv)[i] > vector_clock [i])
-					break;
+					return 0;
 			}	
 		}
 		//execute the operation
@@ -327,11 +335,25 @@ int check_pending_operations()
 
 dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst)
 {
+	if(first_run)
+	{
+		FILE *client_file_1, *client_file_2,*client_file_3,*log_file;
+		client_file_1 = fopen("client1.txt","w+");
+		client_file_2 = fopen("client2.txt","w+");
+		client_file_3 = fopen("client3.txt","w+");
+		log_file = fopen("Log.txt","w+");
+		putc('\n',log_file);
+		fclose(client_file_1);
+		fclose(client_file_2);
+		fclose(client_file_3);
+		fclose(log_file);
+		first_run = 0;
+	}
 	static dict_data result_data;
 	char  *updated_meaning, *temp;
 	int should_wait = 0;
 	//verify the timestamps validity
-	if(is_timestamp_valid(node_arg -> clock))
+	if(is_timestamp_valid(node_arg -> clock, node_arg -> clnt_no))
 	{	
 		//check if the operation is apt to be executed now
 		//else add it to the wait_buffer
@@ -378,9 +400,9 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							result_data.meaning = "";
 							result_data.flag = SUCCESS;
 					
-						}	
-						free(updated_meaning);		
+						}			
 						log_event(node_arg->word, updated_meaning, "Insertion", node_arg->clnt_no);	
+						free(updated_meaning);
 						break;
 
 				case SEARCH:DELETE:	result_data.meaning = linearSearch(node_arg->word);
@@ -414,9 +436,11 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 							}
 							break;  				
 			}//switch end
+			printf("\nExecuted operation from client:%d with timestamp %d, %d, %d",node_arg->clnt_no, node_arg -> clock[0],node_arg -> clock[1],node_arg -> clock[2]);
 			++(vector_clock[(node_arg -> clnt_no) -1]);
+			printf("\nVector Clock updated to %d %d %d", vector_clock[0],vector_clock[1],vector_clock[2]);
 			check_pending_operations();
-			printf("Vector Clock updated to %d %d %d", vector_clock[0],vector_clock[1],vector_clock[2]);
+			
 		}
 		else
 		{
@@ -468,7 +492,8 @@ dict_data * operation_execute_1_svc(dict_data *node_arg, struct svc_req *srvrqst
 		result_data.meaning = "";
 		result_data.flag = INVALID;
 	}
-	printf("\n Recieved message from client:%d with timestamp %d, %d, %d",node_arg->clnt_no, node_arg -> clock[0],node_arg -> clock[1],node_arg -> clock[2]);
+	printf("\nRecieved message from client:%d with timestamp %d, %d, %d",node_arg->clnt_no, node_arg -> clock[0],node_arg -> clock[1],node_arg -> clock[2]);
+	fflush(stdout);
 	//return the result
 	return (&result_data);
 	

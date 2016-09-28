@@ -2,7 +2,7 @@ struct dict_data{
 	string word<>;
 	string meaning<>;
 	int flag;
-	int *clock;
+	int clock[3];
 	int clnt_no;
 };
 program DICTIONARY_PROG { 

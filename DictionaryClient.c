@@ -108,7 +108,8 @@ int init_search()
 	search_data.meaning = "";
 	search_data.flag = SEARCH_OP;
 	search_data.clnt_no = CLIENT_ID;
-	search_data.clock = timestamp;
+	for(int i = 0; i<3; i++)
+		search_data.clock[i] = timestamp[i];
 	search_result_data = operation_execute_1(&search_data, cl1);
 	result_flag(search_result_data , "Search");
 	if(search_result_data != NULL && search_result_data->flag == SUCCESS)
@@ -156,7 +157,8 @@ int init_insert()
 	insert_data.meaning = verifyAndToSmall(y, strlen(y));
 	insert_data.flag = INSERT_OP;
 	insert_data.clnt_no = CLIENT_ID;
-	insert_data.clock = timestamp;
+	for(int i = 0; i<3; i++)
+		insert_data.clock[i] = timestamp[i];
 	insert_result_data = operation_execute_1(&insert_data, cl1);
 	result_flag(insert_result_data, "Insert");
 	printf("on server 1\n");
@@ -185,6 +187,9 @@ int init_delete()
 	delete_data.word = verifyAndToSmall(Q_word, strlen(Q_word));
 	delete_data.meaning = "";
 	delete_data.flag = CONFIRM_DELETE_OP;
+	delete_data.clnt_no = CLIENT_ID;
+	for(int i = 0; i<3; i++)
+		delete_data.clock[i] = timestamp[i];
 	delete_result_data = operation_execute_1(&delete_data, cl1); //server 1
 	result_flag(delete_result_data , "Delete");
 	printf("on server 1\n");
@@ -214,7 +219,7 @@ int init_delete()
 int showMenu(){
 	enum OP {SEARCH = 1, INSERT, DELETE, EXIT};
 	int usr_inp;
-	printf("RPC Dictionary \n");
+	printf("\nRPC Dictionary \n");
 	printf("You want to???\n");
 	printf("1. Search a word, or \n2. Insert new word-meaning, or \n3. Delete a word \n4. Enough of this \n");
 	printf("Your Choice please - ");
@@ -252,16 +257,16 @@ int main (int argc, char **argv)
 	 }
 	do{
 		cl1 = clnt_create(argv[1], DICTIONARY_PROG, DICTIONARY_VERS, "tcp");
-		tvl.tv_sec = 100;
-		clnt_control(cl1, CLSET_TIMEOUT, (char *)&tvl);
-		
 		cl2 = clnt_create(argv[2], DICTIONARY_PROG, DICTIONARY_VERS, "tcp");
-		clnt_control(cl2, CLSET_TIMEOUT, (char *)&tvl);
 		if(cl1 == NULL || cl2 == NULL)
 		{
 			printf("Connection error with servers!!!");
 			exit(0);
 		}
+		tvl.tv_sec = 100;
+		clnt_control(cl1, CLSET_TIMEOUT, (char *)&tvl);		
+		clnt_control(cl2, CLSET_TIMEOUT, (char *)&tvl);
+		
 	}while(!showMenu());
 
 	return 1;
